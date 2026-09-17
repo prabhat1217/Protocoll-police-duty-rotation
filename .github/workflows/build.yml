@@ -1,0 +1,67 @@
+name: Build APK and Windows EXE
+
+on:
+  workflow_dispatch:
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Find Android project
+        run: |
+          mkdir -p android-project
+          unzip -q "$(find . -name 'Police-Duty-Rotation-Mobile-PC-Application-V4-FINAL.zip' | head -1)" -d extracted
+          find extracted -name build.gradle -o -name settings.gradle
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build Android APK
+        run: |
+          PROJECT=$(dirname "$(find extracted -name build.gradle | head -1)")
+          cd "$PROJECT"
+          gradle assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Police-Duty-Rotation-APK
+          path: '**/build/outputs/apk/**/*.apk'
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract project
+        shell: powershell
+        run: |
+          $zip = Get-ChildItem -Recurse -Filter "Police-Duty-Rotation-Mobile-PC-Application-V4-FINAL.zip" | Select-Object -First 1
+          Expand-Archive $zip.FullName -DestinationPath extracted -Force
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build Windows EXE
+        shell: powershell
+        run: |
+          $pkg = Get-ChildItem extracted -Recurse -Filter package.json | Select-Object -First 1
+          Set-Location $pkg.Directory.FullName
+          npm install
+          npm run dist
+
+      - name: Upload Windows EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: Police-Duty-Rotation-Windows-EXE
+          path: 'extracted/**/dist/*.exe'
